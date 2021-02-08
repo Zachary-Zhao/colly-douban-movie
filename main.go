@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"regexp"
+	"strings"
 
-	_ "colly/models"
+	"strconv"
+
+	"colly/models"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/queue"
@@ -13,23 +16,39 @@ import (
 func main() {
 	url := "https://movie.douban.com/top250"
 	c := colly.NewCollector()
-	var contents []byte
+	rd := regexp.MustCompile(`导演:(.+)`)
+	ry := regexp.MustCompile(`\b\d{4}\b`)
+
+	movies := []*models.Movie{}
 
 	// create a request queue with 2 consumer threads
 	q, _ := queue.New(
 		1, // Number of consumer threads
-		&queue.InMemoryQueueStorage{MaxSize: 1000}, // Use default queue storage
+		&queue.InMemoryQueueStorage{MaxSize: 100}, // Use default queue storage
 	)
 
-	c.OnHTML("li div[class=info] a", func(e *colly.HTMLElement) {
-		// content := []byte("")
-		e.ForEach("span", func(i int, ee *colly.HTMLElement) {
-			fmt.Print(ee.Text)
-			contents = append(contents, []byte(ee.Text)...)
-		})
-		fmt.Println("\n")
-		content := []byte("\n")
-		contents = append(contents, content...)
+	c.OnHTML("li div[class=info]", func(e *colly.HTMLElement) {
+		movie := &models.Movie{}
+
+		s := e.DOM.Find("div[class=hd] a span").Text()
+		movie.Name = s
+		fmt.Println(s)
+
+		s = e.DOM.Find("div[class=bd] p").Text()
+		sd := rd.FindStringSubmatch(s)
+		sy := ry.FindStringSubmatch(s)
+		s = strings.TrimSpace(sd[1])
+		movie.Director = s
+		fmt.Println(s)
+		s = sy[0]
+		movie.Year, _ = strconv.Atoi(s)
+		fmt.Println(s)
+
+		s = e.DOM.Find("div[class=bd] div span:nth-child(2)").Text()
+		movie.Score, _ = strconv.ParseFloat(s, 64)
+		fmt.Println(s)
+
+		movies = append(movies, movie)
 	})
 
 	c.OnRequest(func(r *colly.Request) {
@@ -44,6 +63,5 @@ func main() {
 	// Consume URLs
 	q.Run(c)
 
-	ioutil.WriteFile("豆瓣电影top250.txt", contents, 0644)
-	// models.BulkCreate([]*models.Movie{&models.Movie{Name: "电影1"}, &models.Movie{Name: "电影2"}})
+	models.BulkCreate(movies)
 }

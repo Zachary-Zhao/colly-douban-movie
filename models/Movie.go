@@ -9,8 +9,8 @@ type Movie struct {
 	gorm.Model
 	Name     string
 	Director string
-	Year     int8
-	Score    float32
+	Year     int
+	Score    float64
 }
 
 func init() {
